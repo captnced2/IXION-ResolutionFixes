@@ -1,5 +1,5 @@
 # Resolution Fixes
-[Nexusmods]()  
+[Nexusmods](https://www.nexusmods.com/ixion/mods/15)  
 <br>
 This mod fixes some bug/issues with IXION resolutions.  
 Currently fixes two things:
