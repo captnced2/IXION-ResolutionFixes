@@ -1,5 +1,4 @@
-﻿using System;
-using BepInEx;
+﻿using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
@@ -11,27 +10,58 @@ namespace ResolutionFixes;
 
 [BepInPlugin(Guid, Name, Version)]
 [BepInProcess("IXION.exe")]
+[BepInDependency("captnced.IMHelper")]
 public class Plugin : BasePlugin
 {
     private const string Guid = "captnced.ResolutionFixes";
     private const string Name = "ResolutionFixes";
-    private const string Version = "1.0.0";
+    private const string Version = "1.1.0";
     internal new static ManualLogSource Log;
     internal static ConfigFile config;
+    private static bool enabled = true;
+    private static Harmony harmony;
 
     public override void Load()
     {
         Log = base.Log;
         config = Config;
-        var harmony = new Harmony(Guid);
+        harmony = new Harmony(Guid);
+        GameStateHelper.addSceneChangedListener(FixMainMenuUI, GameStateHelper.GameScene.MainMenu);
+        GameStateHelper.addSceneChangedToInGameListener(FixInGameUI);
+        if (IL2CPPChainloader.Instance.Plugins.ContainsKey("captnced.IMHelper")) enabled = ModsMenu.isSelfEnabled();
+        if (!enabled)
+            Log.LogInfo("Disabled by IMHelper!");
+        else
+            init();
+    }
+
+    private static void init()
+    {
         harmony.PatchAll();
-        Action mainMenu = delegate { FixMainMenuUI(); };
-        Action inGame = delegate { FixInGameUI(); };
-        GameStateHelper.addSceneChangedListener(mainMenu, GameStateHelper.GameScene.MainMenu);
-        GameStateHelper.addSceneChangedToInGameListener(inGame);
         foreach (var patch in harmony.GetPatchedMethods())
             Log.LogInfo("Patched " + patch.DeclaringType + ":" + patch.Name);
         Log.LogInfo("Loaded \"" + Name + "\" version " + Version + "!");
+    }
+
+    private static void disable()
+    {
+        harmony.UnpatchSelf();
+        Log.LogInfo("Unloaded \"" + Name + "\" version " + Version + "!");
+    }
+
+    public static void enable(bool value)
+    {
+        enabled = value;
+        if (enabled)
+        {
+            FixMainMenuUI();
+            init();
+        }
+        else
+        {
+            FixMainMenuUI(0, 0);
+            disable();
+        }
     }
 
     internal static void FixUI(Resolution res)
@@ -42,17 +72,19 @@ public class Plugin : BasePlugin
         else Log.LogError("\"" + GameStateHelper.currentScene + " is not a valid scene to reposition UI");
     }
 
-    internal static void FixMainMenuUI()
+    private static void FixMainMenuUI()
     {
+        if (!enabled) return;
         FixMainMenuUI(Screen.currentResolution.width, Screen.currentResolution.height);
     }
 
-    internal static void FixMainMenuUI(Resolution res)
+    private static void FixMainMenuUI(Resolution res)
     {
+        if (!enabled) return;
         FixMainMenuUI(res.width, res.height);
     }
 
-    internal static void FixMainMenuUI(int w, int h)
+    private static void FixMainMenuUI(int w, int h)
     {
         var menu = GameObject.Find("Canvas/1920x1080/Canvas Group/Default").transform;
         var version = GameObject.Find("Canvas/1920x1080/Build Version").transform;
@@ -71,18 +103,19 @@ public class Plugin : BasePlugin
         Log.LogInfo("Repositioned main menu UI");
     }
 
-    internal static void FixInGameUI()
+    private static void FixInGameUI()
     {
         FixInGameUI(Screen.currentResolution.width, Screen.currentResolution.height);
     }
 
-    internal static void FixInGameUI(Resolution res)
+    private static void FixInGameUI(Resolution res)
     {
         FixInGameUI(res.width, res.height);
     }
 
-    internal static void FixInGameUI(int w, int h)
+    private static void FixInGameUI(int w, int h)
     {
+        if (!enabled) return;
         var sectors = GameObject.Find("Canvas/1920x1080/Bottom/Minimap Controller").transform;
         var camera = GameObject.Find("Canvas/1920x1080/Bottom/UI Camera Controls").transform;
         var navigation = GameObject.Find("Canvas/1920x1080/Bottom/Navigation Menu").transform;
