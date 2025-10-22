@@ -1,5 +1,7 @@
 ﻿using System.IO;
+using BulwarkStudios.Utils.UI;
 using HarmonyLib;
+using IMHelper;
 using Stanford.Settings.Video;
 using UnityEngine;
 
@@ -58,8 +60,20 @@ public class Patches
             {
                 File.WriteAllText(Plugin.config.ConfigFilePath, __instance.GetResolution().ToString());
                 Plugin.Log.LogInfo("Saved resolution \"" + __instance.GetResolution() + "\" to config");
-                Plugin.FixUI(__instance.GetResolution());
             }
+        }
+    }
+
+    [HarmonyPatch(typeof(UIAspectRatioResolution), nameof(UIAspectRatioResolution.RefreshRatio))]
+    public static class RatioResolutionPatch
+    {
+        public static void Postfix()
+        {
+            if (!Plugin.enabled) return;
+            if (GameStateHelper.currentScene == GameStateHelper.GameScene.MainMenu)
+                Plugin.FixMainMenuUI(Screen.currentResolution.width, Screen.currentResolution.height);
+            if (GameStateHelper.isInGame())
+                Plugin.FixInGameUI(Screen.currentResolution.width, Screen.currentResolution.height);
         }
     }
 }

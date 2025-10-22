@@ -1,10 +1,13 @@
-﻿using BepInEx;
+﻿using System.Collections;
+using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
+using BepInEx.Unity.IL2CPP.Utils;
 using HarmonyLib;
 using IMHelper;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace ResolutionFixes;
 
@@ -15,19 +18,19 @@ public class Plugin : BasePlugin
 {
     private const string Guid = "captnced.ResolutionFixes";
     private const string Name = "ResolutionFixes";
-    private const string Version = "1.1.0";
+    private const string Version = "2.0.0";
     internal new static ManualLogSource Log;
     internal static ConfigFile config;
-    private static bool enabled = true;
+    internal static bool enabled = true;
     private static Harmony harmony;
+    private static MonoHelper monoHelper;
 
     public override void Load()
     {
         Log = base.Log;
         config = Config;
         harmony = new Harmony(Guid);
-        GameStateHelper.addSceneChangedListener(FixMainMenuUI, GameStateHelper.GameScene.MainMenu);
-        GameStateHelper.addSceneChangedToInGameListener(FixInGameUI);
+        monoHelper = AddComponent<MonoHelper>();
         if (IL2CPPChainloader.Instance.Plugins.ContainsKey("captnced.IMHelper")) enabled = ModsMenu.isSelfEnabled();
         if (!enabled)
             Log.LogInfo("Disabled by IMHelper!");
@@ -54,103 +57,57 @@ public class Plugin : BasePlugin
         enabled = value;
         if (enabled)
         {
-            FixMainMenuUI();
+            FixMainMenuUI(Screen.currentResolution.width, Screen.currentResolution.height);
             init();
         }
         else
         {
-            FixMainMenuUI(0, 0);
+            FixMainMenuUI(1920, 1080);
             disable();
         }
     }
 
-    internal static void FixUI(Resolution res)
+    internal static void FixMainMenuUI(int w, int h)
     {
-        if (GameStateHelper.isInGame())
-            FixInGameUI(res);
-        else if (GameStateHelper.currentScene == GameStateHelper.GameScene.MainMenu) FixMainMenuUI(res);
-        else Log.LogError("\"" + GameStateHelper.currentScene + " is not a valid scene to reposition UI");
+        foreach (var a in Resources.FindObjectsOfTypeAll<AspectRatioFitter>()) a.aspectRatio = (float)w / h;
     }
 
-    private static void FixMainMenuUI()
+    internal static void FixInGameUI(int w, int h)
     {
-        if (!enabled) return;
-        FixMainMenuUI(Screen.currentResolution.width, Screen.currentResolution.height);
-    }
-
-    private static void FixMainMenuUI(Resolution res)
-    {
-        if (!enabled) return;
-        FixMainMenuUI(res.width, res.height);
-    }
-
-    private static void FixMainMenuUI(int w, int h)
-    {
-        var menu = GameObject.Find("Canvas/1920x1080/Canvas Group/Default").transform;
-        var version = GameObject.Find("Canvas/1920x1080/Build Version").transform;
-        if ((w == 2560 && h == 1080) ||
-            (w == 3440 && h == 1440))
+        var science = GameObject.Find("Canvas/1920x1080/Top/Top Bar/Static/Science");
+        var scienceIcon = science.transform.FindChild("Icon");
+        if (scienceIcon != null)
         {
-            menu.localPosition = new Vector3(-300, 0, 0);
-            version.localPosition = new Vector3(1250, -530, 0);
-        }
-        else
-        {
-            menu.localPosition = new Vector3(0, 0, 0);
-            version.localPosition = new Vector3(950, -530, 0);
+            var o = new GameObject("Science ResolutionFix");
+            o.transform.SetParent(science.transform.parent);
+            scienceIcon.transform.SetParent(o.transform);
         }
 
-        Log.LogInfo("Repositioned main menu UI");
-    }
-
-    private static void FixInGameUI()
-    {
-        FixInGameUI(Screen.currentResolution.width, Screen.currentResolution.height);
-    }
-
-    private static void FixInGameUI(Resolution res)
-    {
-        FixInGameUI(res.width, res.height);
-    }
-
-    private static void FixInGameUI(int w, int h)
-    {
-        if (!enabled) return;
-        var sectors = GameObject.Find("Canvas/1920x1080/Bottom/Minimap Controller").transform;
-        var camera = GameObject.Find("Canvas/1920x1080/Bottom/UI Camera Controls").transform;
-        var navigation = GameObject.Find("Canvas/1920x1080/Bottom/Navigation Menu").transform;
-        var objectives = GameObject.Find("Canvas/1920x1080/Top/Objective System").transform;
-        var settings = GameObject.Find("Canvas/1920x1080/Top/Settings Button").transform;
-        var travel = GameObject.Find("Canvas/1920x1080/Bottom/TravelInfos").transform;
-        var spaceVehicles = GameObject.Find("Canvas/1920x1080/Space Vehicles").transform;
-        var systemButtons = spaceVehicles.parent;
-        var buildings = GameObject.Find("Canvas/1920x1080/WindowManagerRight").transform;
-        if ((w == 2560 && h == 1080) ||
-            (w == 3440 && h == 1440))
+        foreach (var a in Resources.FindObjectsOfTypeAll<AspectRatioFitter>())
         {
-            sectors.localPosition = new Vector3(-1260, -530, 0);
-            camera.localPosition = new Vector3(-1273, -540, 0);
-            navigation.localPosition = new Vector3(1275, -530, 0);
-            objectives.localPosition = new Vector3(-310, 0, 0);
-            settings.localPosition = new Vector3(320, 0, 0);
-            travel.localPosition = new Vector3(310, 0, 0);
-            systemButtons.localPosition = new Vector3(-565, 0, 0);
-            spaceVehicles.localPosition = new Vector3(-480, -540, 0);
-            buildings.localPosition = new Vector3(320, 0, 0);
-        }
-        else
-        {
-            sectors.localPosition = new Vector3(-950, -530, 0);
-            camera.localPosition = new Vector3(-960, -540, 0);
-            navigation.localPosition = new Vector3(945, -530, 0);
-            objectives.localPosition = new Vector3(0, 0, 0);
-            settings.localPosition = new Vector3(0, 0, 0);
-            travel.localPosition = new Vector3(0, 0, 0);
-            systemButtons.localPosition = new Vector3(0, 0, 0);
-            spaceVehicles.localPosition = new Vector3(-950, -540, 0);
-            buildings.localPosition = new Vector3(0, 0, 0);
+            a.enabled = true;
+            a.aspectRatio = (float)w / h;
         }
 
-        Log.LogInfo("Repositioned in-game UI");
+        monoHelper.StartCoroutine(fixUiDelayed(1f));
+    }
+
+    private static IEnumerator fixUiDelayed(float delayTime)
+    {
+        yield return new WaitForSeconds(delayTime);
+        var systemButtons = GameObject.Find("Canvas/1920x1080/Space Vehicles").transform.parent;
+        systemButtons.localPosition = new Vector3(-245, 0, 0);
+        var rect = GameObject.Find("Canvas/1920x1080/Top/Top Bar/Static/Science").GetComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(0, rect.sizeDelta.y);
+        while (rect.rect.x is < -40 or > -30)
+            rect.sizeDelta = rect.rect.x < -40
+                ? new Vector2(rect.sizeDelta.x - 10, rect.sizeDelta.y)
+                : new Vector2(rect.sizeDelta.x + 10, rect.sizeDelta.y);
+
+        foreach (var a in Resources.FindObjectsOfTypeAll<AspectRatioFitter>()) a.enabled = false;
+    }
+
+    private class MonoHelper : MonoBehaviour
+    {
     }
 }
