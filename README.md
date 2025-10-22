@@ -4,7 +4,7 @@
 This mod fixes some bug/issues with IXION resolutions.  
 Currently fixes two things:
 - Resolution doesn't reset anymore after restart
-- UI is now positioned at the border of the screen for ultrawide resolutions (2560x1080 & 3440x1440)
+- UI is now positioned at the border of the screen for all abnormal resolutions
 
 The resolution sometimes still resets but I don't know when that happens so its difficult for me to fix.  
 
